@@ -55,17 +55,17 @@ http {
 ////////////////// Test //////////////////
 
 Encryption Test ->
-curl -v --header 'Host: localhost' --header 'Content-Type: application/json' \
+curl -v --header 'Content-Type: application/json' \
     -d '{"transactionId": 12344, "data": "VGhpcyBpcyBhbiBFbmNyeXB0aW9uIHRlc3Q=", "type": 0}' \
     http://localhost:9999/hsm/encdec
 
 Decryption Test ->
-curl -v --header 'Host: localhost' --header 'Content-Type: application/json' \
+curl -v --header 'Content-Type: application/json' \
     -d '{"transactionId": 12344, "data": "dU5OirXvm1gcysih4fw4TvLIl\/gOt7OczpqmgcWCbdY=", "type": 1}' \
     http://localhost:9999/hsm/encdec
 
 Sing Test ->
-curl -v --header 'Host: localhost' --header 'Content-Type: application/json' \
+curl -v --header 'Content-Type: application/json' \
     -d '{"transactionId": 345678, "data": "w54r6V8Z0WUN8fSB6l6a7RNn/HoyJI7a2NwlMk10kg0=", "type": 9}'  \
     http://localhost:9999/hsm/signver
 
