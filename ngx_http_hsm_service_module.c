@@ -260,10 +260,11 @@ static reponse_data_t *getReqBodyString(OP_TYPE_e opType, ngx_http_request_t *r)
     reponse_data->body_data = (char *)ngx_pcalloc(r->connection->pool, len + 1 );
     ngx_memcpy(reponse_data->body_data, json_object_get_string(dataObj), len) ;
 
-    my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "getReqBodyString, type: %d transaction_id:%d dataLen: %d" , reponse_data->type, reponse_data->transaction_id, len) ;
+    my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "getReqBodyString-> type: %d transaction_id:%d dataLen: %d" , reponse_data->type, reponse_data->transaction_id, len) ;
 
     ngx_pfree(r->connection->pool, rbody) ;
     return reponse_data ;
+
 }
 
 static ngx_chain_t *prepareResponse(ngx_http_request_t *r, const char* msg) 
