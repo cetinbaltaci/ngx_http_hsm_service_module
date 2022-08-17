@@ -1,0 +1,8 @@
+SRCS="$ngx_addon_dir/ngx_http_hsm_service_module.c \
+    $ngx_addon_dir/hsm.c"
+
+CORE_LIBS="$CORE_LIBS -ljson-c"
+ngx_addon_name="ngx_http_hsm_service_module"
+HTTP_MODULES="$HTTP_MODULES ngx_http_hsm_service_module"
+NGX_ADDON_SRCS="$NGX_ADDON_SRCS $SRCS"
+HTTP_INCS="$HTTP_INCS $ngx_addon_dir/. /token_src/other/nginx_modules/bin/include"
