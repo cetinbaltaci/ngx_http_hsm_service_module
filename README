@@ -2,8 +2,8 @@ cd src/nginx_modules/nginx-1.22.0
 
 ./configure --prefix=src/nginx_modules/bin/ 
             --add-module=src/nginx_modules/ngx_http_hsm_service_module 
-            --with-cc-opt="-Isrc/nginx_modules/bin/include" 
-            --with-ld-opt="-Lsrc/nginx_modules/bin/lib"
+            --with-cc-opt="-Ijson-c/include" 
+            --with-ld-opt="-Ljson-c/lib"
 make
 make install
 ../bin/sbin/nginx -c ../bin/conf/nginx.conf
