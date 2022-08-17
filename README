@@ -2,8 +2,8 @@ cd src/nginx_modules/nginx-1.22.0
 
 ./configure --prefix=src/nginx_modules/bin/ 
             --add-module=src/nginx_modules/ngx_http_hsm_service_module 
-            --with-cc-opt="-Isrc/nginx_modules/bin/include" 
-            --with-ld-opt="-Lsrc/nginx_modules/bin/lib"
+            --with-cc-opt="-Ijson-c/include" 
+            --with-ld-opt="-Ljson-c/lib"
 make
 make install
 ../bin/sbin/nginx -c ../bin/conf/nginx.conf
@@ -55,20 +55,20 @@ http {
 ////////////////// Test //////////////////
 
 Encryption Test ->
-curl -v --header 'Host: localhost' --header 'Content-Type: application/json' \
-    -d '{"transactionId": 12344, "data": "VGhpcyBpcyBhbiBFbmNyeXB0aW9uIHRlc3Q=", "type": 0}' \
+curl -v --header 'Content-Type: application/json' \
+    -d '{"transactionId": 12344, "data": "BASE64(PLAIN_DATA)", "type": 0}' \
     http://localhost:9999/hsm/encdec
 
 Decryption Test ->
-curl -v --header 'Host: localhost' --header 'Content-Type: application/json' \
-    -d '{"transactionId": 12344, "data": "dU5OirXvm1gcysih4fw4TvLIl\/gOt7OczpqmgcWCbdY=", "type": 1}' \
+curl -v --header 'Content-Type: application/json' \
+    -d '{"transactionId": 12344, "data": "BASE64(ENC_DATA_WITH_AES)", "type": 1}' \
     http://localhost:9999/hsm/encdec
 
 Sing Test ->
-curl -v --header 'Host: localhost' --header 'Content-Type: application/json' \
-    -d '{"transactionId": 345678, "data": "w54r6V8Z0WUN8fSB6l6a7RNn/HoyJI7a2NwlMk10kg0=", "type": 9}'  \
+curl -v --header 'Content-Type: application/json' \
+    -d '{"transactionId": 345678, "data": "BASE64(PLAIN_DATA)", "type": 0}'  \
     http://localhost:9999/hsm/signver
 
 Verify Test ->
-curl -v --header 'Content-Type: application/json' -d '{"transactionId": 12344, "data": "w54r6V8Z0WUN8fSB6l6a7RNn/HoyJI7a2NwlMk10kg15yhYQkC347Hxy67Jl85SHKbup7YKpFs2UWbu5K07imcvLChvvYF/Om4dgCW3UNdtmuwg90lm09KYbJ8eqQrjNO6FsZcRrERq149RQ89GtcdQtR0rkLh1jkxotgtMaBzfB++tedCl64oduSDbpVa8mjCtIT8rJtY2ddBt6q0MbFJBF1gjvAf+gWdc0j8Q5DWhPoB3oKSA1UQWbZWzrThJ9LfJxBo7x3ujExVWNTxRMlQqGLja1ZTHCj6+9X+07GOianMpXvkfiKV71aRmz0+lnkUSsYCpMcKvb+4rDKfImAmuuWpEvK8KKem2CSWdxwGm+9QxaFgx2FTvPcYVnW+X7", "type": 1}' http://localhost:9999/hsm/signver
+curl -v --header 'Content-Type: application/json' -d '{"transactionId": 12344, "data": "BASE64(SHA256(PLAIN_DATA)+SIGN)", "type": 1}' http://localhost:9999/hsm/signver
 
