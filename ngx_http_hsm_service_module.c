@@ -221,30 +221,46 @@ static reponse_data_t *getReqBodyString(OP_TYPE_e opType, ngx_http_request_t *r)
         p = ngx_cpymem(p, in->buf->pos, len) ;
     }
 
-
     struct json_object *jobj;
-    struct json_object *tranIdObj;
-    struct json_object *dataObj;
-    struct json_object *typeIdObj;
-
     jobj = json_tokener_parse(rbody);
+    if (!jobj) {
+        my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "JSON Parse error!" ) ;
+        return NULL ;
+    }
+    
+    struct json_object *tranIdObj;
+    json_object_object_get_ex(jobj, "transactionId", &tranIdObj);
+    if (!tranIdObj){
+        my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "JSON Error! 'transactionId' not found" ) ;
+        return NULL ;
+    }
+    
+    struct json_object *typeIdObj;
+    json_object_object_get_ex(jobj, "type", &typeIdObj);
+    if (!typeIdObj) {
+        my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "JSON Error! 'type' not found" ) ;
+        return NULL ;
+    }
+
+    struct json_object *dataObj;
+    json_object_object_get_ex(jobj, "data", &dataObj);
+    if (!dataObj) {
+        my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "JSON Error! 'data' not found" ) ;
+        return NULL ;
+    }
+    len = json_object_get_string_len(dataObj);
+    if (!len){
+        my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "JSON Error! 'data' is empty" ) ;
+        return NULL ;
+    }
 
     reponse_data_t *reponse_data = (reponse_data_t *)ngx_pcalloc(r->connection->pool, sizeof(reponse_data_t));
-
-
-    json_object_object_get_ex(jobj, "type", &typeIdObj);
     reponse_data->type = json_object_get_uint64(typeIdObj);
-
-    json_object_object_get_ex(jobj, "transactionId", &tranIdObj);
     reponse_data->transaction_id = json_object_get_uint64(tranIdObj) ;
-
-    json_object_object_get_ex(jobj, "data", &dataObj);
-    len = json_object_get_string_len(dataObj);
     reponse_data->body_data = (char *)ngx_pcalloc(r->connection->pool, len + 1 );
     ngx_memcpy(reponse_data->body_data, json_object_get_string(dataObj), len) ;
 
-
-    my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "getReqBodyString, reponse_data->type: %d" , reponse_data->type) ;
+    my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "getReqBodyString, type: %d transaction_id:%d dataLen: %d" , reponse_data->type, reponse_data->transaction_id, len) ;
 
     ngx_pfree(r->connection->pool, rbody) ;
     return reponse_data ;
