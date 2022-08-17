@@ -61,7 +61,7 @@ curl -v --header 'Content-Type: application/json' \
 
 Decryption Test ->
 curl -v --header 'Content-Type: application/json' \
-    -d '{"transactionId": 12344, "data": "BASE64(ENCR_AES(DATA))", "type": 1}' \
+    -d '{"transactionId": 12344, "data": "BASE64(ENC_DATA_WITH_AES)", "type": 1}' \
     http://localhost:9999/hsm/encdec
 
 Sing Test ->
