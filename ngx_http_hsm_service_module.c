@@ -2,11 +2,14 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
-#include <stdarg.h>
+#include <string.h>
 
 #include "json-c/json.h"
 
 #include "hsm.h"
+
+
+#define VERSION "1.0"
 
 typedef struct {
     ngx_str_t user;
@@ -41,7 +44,7 @@ typedef enum {
 #define LOG_TAG " {HSMSERVICE} "
 
 #define my_ngx_log_error(level, log, err, fmt, ...)                                        \
-    ngx_log_error_core(NGX_LOG_DEBUG, log, err, LOG_TAG # fmt, ##__VA_ARGS__)
+    ngx_log_error_core(level, log, err, LOG_TAG#fmt, ##__VA_ARGS__)
 
 static char *ngx_http_hsm_service(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static ngx_int_t ngx_http_hsm_service_handler(ngx_http_request_t *r);
@@ -54,10 +57,10 @@ static void *ngx_http_hsm_service_create_main_conf(ngx_conf_t *cf);
 static char *ngx_http_hsm_service_init_main_conf (ngx_conf_t *cf, void *cnf);
 
 static ngx_int_t ngx_http_hsm_service_encrypt_decrypt_data(ngx_http_request_t *r, unsigned long slotId, const char* user, const char* pass,
-    const char* keyName, ngx_str_t in_base64str, ngx_str_t *outStr, ngx_int_t *resCode, char type);
+    const char* keyName, ngx_str_t in_base64str, ngx_str_t *outStr, ngx_int_t *resCode, u_char type);
 
 static ngx_int_t ngx_http_hsm_service_sign_verify_data(ngx_http_request_t *r, unsigned long slotId, const char* user, const char* pass,
-                const char* keyName, ngx_str_t in_base64str, ngx_str_t *outStr, ngx_int_t *resCode, char type) ;
+                const char* keyName, ngx_str_t in_base64str, ngx_str_t *outStr, ngx_int_t *resCode, u_char type) ;
 
 static ngx_command_t ngx_http_hsm_service_commands[] = {
 
@@ -224,33 +227,33 @@ static reponse_data_t *getReqBodyString(OP_TYPE_e opType, ngx_http_request_t *r)
     struct json_object *jobj;
     jobj = json_tokener_parse(rbody);
     if (!jobj) {
-        my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "JSON Parse error!" ) ;
+        my_ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "JSON Parse error!" ) ;
         return NULL ;
     }
     
     struct json_object *tranIdObj;
     json_object_object_get_ex(jobj, "transactionId", &tranIdObj);
     if (!tranIdObj){
-        my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "JSON Error! 'transactionId' not found" ) ;
+        my_ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "JSON Error! 'transactionId' not found" ) ;
         return NULL ;
     }
     
     struct json_object *typeIdObj;
     json_object_object_get_ex(jobj, "type", &typeIdObj);
     if (!typeIdObj) {
-        my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "JSON Error! 'type' not found" ) ;
+        my_ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "JSON Error! 'type' not found" ) ;
         return NULL ;
     }
 
     struct json_object *dataObj;
     json_object_object_get_ex(jobj, "data", &dataObj);
     if (!dataObj) {
-        my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "JSON Error! 'data' not found" ) ;
+        my_ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "JSON Error! 'data' not found" ) ;
         return NULL ;
     }
     len = json_object_get_string_len(dataObj);
     if (!len){
-        my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "JSON Error! 'data' is empty" ) ;
+        my_ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "JSON Error! 'data' is empty" ) ;
         return NULL ;
     }
 
@@ -260,7 +263,7 @@ static reponse_data_t *getReqBodyString(OP_TYPE_e opType, ngx_http_request_t *r)
     reponse_data->body_data = (char *)ngx_pcalloc(r->connection->pool, len + 1 );
     ngx_memcpy(reponse_data->body_data, json_object_get_string(dataObj), len) ;
 
-    my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "getReqBodyString-> type: %d transaction_id:%d dataLen: %d" , reponse_data->type, reponse_data->transaction_id, len) ;
+    my_ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "getReqBodyString-> type: %d transaction_id:%d dataLen: %d" , reponse_data->type, reponse_data->transaction_id, len) ;
 
     ngx_pfree(r->connection->pool, rbody) ;
     return reponse_data ;
@@ -298,7 +301,7 @@ static ngx_chain_t *prepareResponse(ngx_http_request_t *r, const char* msg)
 }
 
 static ngx_int_t ngx_http_hsm_service_sign_verify_data(ngx_http_request_t *r, unsigned long slotId, const char* user, const char* pass,
-                const char* keyName, ngx_str_t in_base64str, ngx_str_t *outStr, ngx_int_t *resCode, char type) 
+                const char* keyName, ngx_str_t in_base64str, ngx_str_t *outStr, ngx_int_t *resCode, u_char type) 
 {
     ngx_int_t ret = NGX_ERROR ;
     ngx_str_t in_str ;
@@ -307,7 +310,7 @@ static ngx_int_t ngx_http_hsm_service_sign_verify_data(ngx_http_request_t *r, un
     in_str.data = (u_char *) ngx_pcalloc(r->connection->pool, in_str.len + 1  ) ;
     
     ret = ngx_decode_base64(&in_str, &in_base64str);
-    my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "ngx_http_hsm_service_sign_verify_data -> Base64 Decode Ret: %d", ret); 
+    my_ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "ngx_http_hsm_service_sign_verify_data -> Base64 Decode Ret: %d", ret); 
     
     *resCode = ret ;
 
@@ -340,7 +343,7 @@ static ngx_int_t ngx_http_hsm_service_sign_verify_data(ngx_http_request_t *r, un
             ret = NGX_ERROR ;
         
         *resCode = (ngx_int_t)ret_hsm ;
-        my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "%s KeyLabel: %s HSMRet: %d NGX_ret: %d", 
+        my_ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "%s KeyLabel: %s HSMRet: %d NGX_ret: %d", 
                         (type == 0) ? "HSMSign" :  (type == 1) ? "HSMVerify" : "UNKNOWN" , 
                         keyName, ret_hsm, ret); 
     } 
@@ -351,7 +354,7 @@ static ngx_int_t ngx_http_hsm_service_sign_verify_data(ngx_http_request_t *r, un
 }
 
 static ngx_int_t ngx_http_hsm_service_encrypt_decrypt_data(ngx_http_request_t *r, unsigned long slotId, const char* user, const char* pass,
-    const char* keyName, ngx_str_t in_base64str, ngx_str_t *outStr, ngx_int_t *resCode, char type) 
+    const char* keyName, ngx_str_t in_base64str, ngx_str_t *outStr, ngx_int_t *resCode, u_char type) 
 {
     
     ngx_int_t ret = NGX_ERROR ;
@@ -361,16 +364,16 @@ static ngx_int_t ngx_http_hsm_service_encrypt_decrypt_data(ngx_http_request_t *r
     in_str.data = (u_char *) ngx_pcalloc(r->connection->pool, in_str.len + 1  ) ;
 
     ret = ngx_decode_base64(&in_str, &in_base64str);
-    my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "ngx_http_hsm_service_encrypt_decrypt_data -> Base64 Decode Ret: %d",  ret); 
+    my_ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "ngx_http_hsm_service_encrypt_decrypt_data -> Base64 Decode Ret: %d",  ret); 
     *resCode = ret ;
     if (ret == NGX_OK) {
         ngx_str_t outBuf = ngx_null_string;
         CK_RV ret_hsm = CKR_GENERAL_ERROR ;
-        if (type == 'E')
-            ret_hsm = HSMEncryptWithAES(slotId, user, pass, keyName,
+        if (type == 0)
+            ret_hsm = HSMEncrypt(slotId, user, pass, keyName,
                 in_str.data, in_str.len, &(outBuf.data), &(outBuf.len)); 
-        else if (type == 'D')
-            ret_hsm = HSMDecryptWithAES(slotId, user, pass, keyName,
+        else if (type == 1)
+            ret_hsm = HSMDecrypt(slotId, user, pass, keyName,
                 in_str.data, in_str.len, &(outBuf.data), &(outBuf.len)); 
         else 
             ret = NGX_ERROR ;
@@ -384,8 +387,8 @@ static ngx_int_t ngx_http_hsm_service_encrypt_decrypt_data(ngx_http_request_t *r
             ret = NGX_ERROR ;
         if (outBuf.data) free(outBuf.data);
         *resCode = (ngx_int_t)ret_hsm ;
-        my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "%s KeyLabel: %s HSMRet: %d NGX_ret: %d", 
-                        (type == 'E') ? "HSMEncryptWithAES" :  (type == 'D') ? "HSMDecryptWithAES" : "UNKNOWN" , 
+        my_ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "%s KeyLabel: %s HSMRet: %d NGX_ret: %d", 
+                        (type == 0) ? "HSMEncrypt" :  (type == 1) ? "HSMDecrypt" : "UNKNOWN" , 
                         keyName, ret_hsm, ret);
     }
 
@@ -398,7 +401,7 @@ static OP_TYPE_e getOpType(ngx_http_request_t *r) {
     char *pathName = (char *) ngx_pcalloc( r->connection->pool, (r->uri_end - r->uri_start) + 1 ) ;
     ngx_memcpy(pathName, r->uri_start,  (r->uri_end - r->uri_start)) ;
     const char *opName = strrchr(pathName, '/') ;
-    my_ngx_log_error(NGX_LOG_INFO,  r->connection->log, 0, "opName: %s", opName);
+    my_ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "opName: %s", opName);
     
     OP_TYPE_e opType = OP_TYPE_NONE ;
 
@@ -452,7 +455,7 @@ static void ngx_http_hsm_service_parse_send(ngx_http_request_t *r)
     ngx_int_t hsm_ret = NGX_ERROR ;
 
     if (opType == OP_TYPE_ENCDEC) {
-        my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "OP_TYPE_ENCDEC , Type: %d, keyLabel: %s",  resData->type, (const char *)loc_conf->encdecKey.data );
+        my_ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "OP_TYPE_ENCDEC , Type: %d, keyLabel: %s",  resData->type, (const char *)loc_conf->encdecKey.data );
         ret = ngx_http_hsm_service_encrypt_decrypt_data(r, (unsigned long)loc_conf->slotId, (const char *)loc_conf->user.data, 
                 (const char *)loc_conf->pass.data, (const char *)loc_conf->encdecKey.data, in_base64str, &dest, &hsm_ret, resData->type) ;
     } else if (opType == OP_TYPE_SIGNVER) {
@@ -460,7 +463,7 @@ static void ngx_http_hsm_service_parse_send(ngx_http_request_t *r)
         const char *key_label = (resData->type == 0  ) ? (const char *)loc_conf->signKey.data : 
                                 (resData->type == 1 ) ? (const char *)loc_conf->verifyKey.data : NULL ;
         
-        my_ngx_log_error(NGX_LOG_INFO, r->connection->log, 0, "OP_TYPE_SIGNVER , Type: %d, keyLabel: %s",  resData->type, key_label );
+        my_ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0, "OP_TYPE_SIGNVER , Type: %d, keyLabel: %s",  resData->type, key_label );
         ret = ngx_http_hsm_service_sign_verify_data(r, (unsigned long)loc_conf->slotId, (const char *)loc_conf->user.data, 
                 (const char *)loc_conf->pass.data, key_label, in_base64str, &dest, &hsm_ret, resData->type) ;
     } else {
@@ -567,15 +570,31 @@ static void *ngx_http_hsm_service_create_main_conf(ngx_conf_t *cf)
     return conf;
 }
 
+void setEnvironment(ngx_conf_t *cf, ngx_str_t confname) {
+    char *key = (char *)strndup((char *)confname.data, confname.len) ;
+    if (key) {
+        char *value =strchr(key, '=');
+        if (value) {
+            key[value - key] = '\0';
+            value++;
+            setenv(key, value, 1) ;
+            my_ngx_log_error(NGX_LOG_NOTICE, cf->log, 0, "KEY: [%s] Value: [%s]", key, value);
+        }
+        free(key) ;
+    }
+}
+
 static char *ngx_http_hsm_service_init_main_conf (ngx_conf_t *cf, void *cnf) 
 {
     hsm_service_main_conf_t *conf = (hsm_service_main_conf_t *)cnf;
+    my_ngx_log_error(NGX_LOG_NOTICE, cf->log, 0, "============ Start  HSM Service Nginx module v%s ============", (const char*)VERSION);
+    my_ngx_log_error(NGX_LOG_NOTICE, cf->log, 0, "LibName : %s",  (const char *)conf->libname.data);
+    my_ngx_log_error(NGX_LOG_NOTICE, cf->log, 0, "ConfName : %s", (const char *)conf->confname.data);
 
-    my_ngx_log_error(NGX_LOG_NOTICE,  cf->log, 0, "LibName : %s",  (const char *)conf->libname.data);
-    my_ngx_log_error(NGX_LOG_NOTICE,  cf->log, 0, "ConfName : %s", (const char *)conf->confname.data);
+    setEnvironment(cf, conf->confname);
 
-    long int rv =  HSMOpen((const char *)conf->libname.data, (const char *)conf->confname.data);
-    my_ngx_log_error(NGX_LOG_NOTICE,  cf->log, 0, "HSMOpen -> ret : %d",rv);
+    long int rv =  HSMOpen((const char *)conf->libname.data);
+    my_ngx_log_error(NGX_LOG_NOTICE, cf->log, 0, "HSMOpen -> ret : %d",rv);
 
     return NGX_CONF_OK; 
 }

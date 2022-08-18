@@ -31,8 +31,8 @@ CK_RV C_HSMDecryptWithAES(CK_SESSION_HANDLE hSession, const char *key_label,
     unsigned char **plainBuf, size_t *plainBufLen) ;
 
 CK_BYTE IV[16] = {
-    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-    0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10
+    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+    0x18, 0x19, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25
 };
 
 size_t pkcs7_padding_add(unsigned char *buf, size_t bufLen, unsigned int blockSize, unsigned char **outBuf) {
@@ -73,11 +73,9 @@ void HSMClose() {
     hHSMLib = NULL ;
 }
 
-CK_RV HSMOpen(const char *libname, const char *confName) {
+CK_RV HSMOpen(const char *libname) {
     CK_RV rc = CKR_GENERAL_ERROR ;
     C_GetFunctionList_t fn_C_GetFunctionList ; 
-
-    setenv("SOFTHSM2_CONF", confName, 1) ;
 
     hHSMLib = dlopen(libname, RTLD_NOW);
     if ( hHSMLib ) {
@@ -209,7 +207,7 @@ CK_OBJECT_HANDLE C_HSMFindObjectFromName(CK_SESSION_HANDLE hSession, const char 
     return hKey ;
 }
 
-CK_RV C_HSMEncryptWithAES(CK_SESSION_HANDLE hSession, const char *key_label, 
+CK_RV C_HSMEncrypt(CK_SESSION_HANDLE hSession, const char *key_label, 
     unsigned char *plainBuf, size_t plainBufLen, 
     unsigned char **cipherBuf, size_t *cipherBufLen) {
     
@@ -220,31 +218,50 @@ CK_RV C_HSMEncryptWithAES(CK_SESSION_HANDLE hSession, const char *key_label,
     if (hKey == CK_INVALID_HANDLE) 
         return CKR_GENERAL_ERROR ;
 
-    CK_MECHANISM mechanism = {
-        CKM_AES_CBC, IV, sizeof(IV)
-    };
-
     CK_LONG objSize = 0  ;
+    CK_LONG keyType = 0 ;
 
     CK_ATTRIBUTE template[] = {
-        {CKA_VALUE_LEN,  &objSize, sizeof(CK_LONG)}
+        {CKA_KEY_TYPE, &keyType, sizeof(CK_LONG)},
+        {CKA_VALUE_LEN, &objSize, sizeof(CK_LONG)}
     };
 
-    CK_RV rv = funcs->C_GetAttributeValue(hSession, hKey, template, 1) ;
+    CK_RV rv = funcs->C_GetAttributeValue(hSession, hKey, template, ARRAY_LEN(template)) ;
     if (rv != CKR_OK)
         return rv ;
     
     unsigned char *bufWithPadding = NULL ;
     size_t len = pkcs7_padding_add(plainBuf, plainBufLen, objSize, &bufWithPadding) ;
 
+    CK_MECHANISM mechanism ;
+    switch (keyType)
+    {
+        case CKK_AES: 
+            mechanism.mechanism = CKM_AES_CBC ;
+            break;
+        case CKK_DES: 
+            mechanism.mechanism = CKM_DES_CBC ;
+            break;
+        case CKK_DES3:
+            mechanism.mechanism = CKM_DES3_CBC ;
+            break;                 
+        default:
+            mechanism.mechanism = 0 ;
+            break;
+    }
+    mechanism.pParameter = IV ;
+    mechanism.ulParameterLen = sizeof(IV);
+
     rv = funcs->C_EncryptInit(hSession, &mechanism, hKey);
     if (rv != CKR_OK) 
         return rv ;
 
-    *cipherBufLen = len  ;
+    *cipherBufLen = len + objSize ;
     *cipherBuf = (unsigned char *) calloc(*cipherBufLen , sizeof(unsigned char)) ;
 
     rv = funcs->C_Encrypt(hSession, bufWithPadding, len, *cipherBuf, cipherBufLen);
+
+    *cipherBuf = realloc(*cipherBuf, *cipherBufLen) ;
 
     if (bufWithPadding) 
         free(bufWithPadding);
@@ -252,7 +269,7 @@ CK_RV C_HSMEncryptWithAES(CK_SESSION_HANDLE hSession, const char *key_label,
 }
 
 
-CK_RV C_HSMDecryptWithAES(CK_SESSION_HANDLE hSession, const char *key_label, 
+CK_RV C_HSMDecrypt(CK_SESSION_HANDLE hSession, const char *key_label, 
     unsigned char *cipherBuf, size_t cipherBufLen, unsigned char **plainBuf, size_t *plainBufLen) 
 {
     
@@ -263,28 +280,46 @@ CK_RV C_HSMDecryptWithAES(CK_SESSION_HANDLE hSession, const char *key_label,
     if (hKey == CK_INVALID_HANDLE) 
         return CKR_GENERAL_ERROR ;
 
-    CK_MECHANISM mechanism = {
-        CKM_AES_CBC, IV, sizeof(IV)
-    };
-
     CK_LONG objSize = 0  ;
+    CK_LONG keyType = 0 ;
 
     CK_ATTRIBUTE template[] = {
-        {CKA_VALUE_LEN,  &objSize, sizeof(CK_LONG)}
+        {CKA_KEY_TYPE, &keyType, sizeof(CK_LONG)},
+        {CKA_VALUE_LEN, &objSize, sizeof(CK_LONG)}
     };
 
-    CK_RV rv = funcs->C_GetAttributeValue(hSession, hKey, template, 1) ;
+    CK_RV rv = funcs->C_GetAttributeValue(hSession, hKey, template, ARRAY_LEN(template)) ;
     if (rv != CKR_OK)
         return rv ;
-    
+
+    CK_MECHANISM mechanism ;
+    switch (keyType)
+    {
+        case CKK_AES: 
+            mechanism.mechanism = CKM_AES_CBC ;
+            break;
+        case CKK_DES: 
+            mechanism.mechanism = CKM_DES_CBC ;
+            break;
+        case CKK_DES3:
+            mechanism.mechanism = CKM_DES3_CBC ;
+            break;                 
+        default:
+            mechanism.mechanism = 0 ;
+            break;
+    }
+    mechanism.pParameter = IV ;
+    mechanism.ulParameterLen = sizeof(IV);
+
     rv = funcs->C_DecryptInit(hSession, &mechanism, hKey);
     if (rv != CKR_OK) 
         return rv ;
 
-    *plainBufLen = cipherBufLen  ;
+    *plainBufLen = cipherBufLen + objSize ;
     *plainBuf = (unsigned char *) calloc(*plainBufLen , sizeof(unsigned char)) ;
     rv = funcs->C_Decrypt(hSession, cipherBuf, cipherBufLen, *plainBuf, plainBufLen);
     *plainBufLen = pkcs7_padding_remove(*plainBuf, *plainBufLen, objSize) ;
+    
     *plainBuf = (unsigned char *)realloc(*plainBuf, *plainBufLen);
     return rv ;
 }
@@ -351,7 +386,7 @@ CK_RV C_HSMVerify(CK_SESSION_HANDLE hSession, const char *key_label, unsigned ch
     return rv ;
 }
 
-CK_RV HSMEncryptWithAES(unsigned long slotID, const char *user, const char *pass, 
+CK_RV HSMEncrypt(unsigned long slotID, const char *user, const char *pass, 
     const char *key_label, unsigned char *plainBuf, size_t plainBufLen, unsigned char **cipherBuf, size_t *cipherBufLen) 
 {
     if (slotID == CK_UNAVAILABLE_INFORMATION || !key_label || !plainBuf || !plainBufLen) return CKR_GENERAL_ERROR;
@@ -359,20 +394,20 @@ CK_RV HSMEncryptWithAES(unsigned long slotID, const char *user, const char *pass
     CK_SESSION_HANDLE hSession = C_HSMOpenSession(slotID, pass ) ;
     if (hSession == CK_INVALID_HANDLE)  return CKR_GENERAL_ERROR ;
 
-    CK_RV rv= C_HSMEncryptWithAES(hSession, key_label, plainBuf, plainBufLen, cipherBuf, cipherBufLen) ;
+    CK_RV rv= C_HSMEncrypt(hSession, key_label, plainBuf, plainBufLen, cipherBuf, cipherBufLen) ;
     C_HSMCloseSession(&hSession);
 
     return rv  ;
 }
 
-CK_RV HSMDecryptWithAES(unsigned long slotID, const char *user, const char *pass, 
+CK_RV HSMDecrypt(unsigned long slotID, const char *user, const char *pass, 
     const char *key_label, unsigned char *cipherBuf, size_t cipherBufLen, unsigned char **plainBuf, size_t *plainBufLen) 
 {
     if (slotID == CK_UNAVAILABLE_INFORMATION || !key_label || !cipherBuf || !cipherBufLen) return CKR_GENERAL_ERROR;
     CK_SESSION_HANDLE hSession = C_HSMOpenSession(slotID, pass ) ;
     if (hSession == CK_INVALID_HANDLE) return CKR_GENERAL_ERROR ;
 
-    CK_RV rv= C_HSMDecryptWithAES(hSession, key_label, cipherBuf, cipherBufLen, plainBuf, plainBufLen) ;
+    CK_RV rv= C_HSMDecrypt(hSession, key_label, cipherBuf, cipherBufLen, plainBuf, plainBufLen) ;
     C_HSMCloseSession(&hSession);
     return rv  ;
 }
