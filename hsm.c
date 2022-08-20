@@ -22,11 +22,11 @@ CK_SESSION_HANDLE C_HSMOpenSession(CK_SLOT_ID slot, const char *pin);
 int C_HSMCloseSession(CK_SESSION_HANDLE *hSession) ;
 
 CK_OBJECT_HANDLE C_HSMFindObjectFromName(CK_SESSION_HANDLE hSession, const char *label) ;
-CK_RV C_HSMEncryptWithAES(CK_SESSION_HANDLE hSession, const char *key_label, 
+CK_RV C_HSMEncrypt(CK_SESSION_HANDLE hSession, const char *key_label, 
     unsigned char *plainBuf, size_t plainBufLen, 
     unsigned char **cipherBuf, size_t *cipherBufLen);
 
-CK_RV C_HSMDecryptWithAES(CK_SESSION_HANDLE hSession, const char *key_label, 
+CK_RV C_HSMDecrypt(CK_SESSION_HANDLE hSession, const char *key_label, 
     unsigned char *cipherBuf, size_t cipherBufLen, 
     unsigned char **plainBuf, size_t *plainBufLen) ;
 

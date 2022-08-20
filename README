@@ -61,12 +61,12 @@ curl -v --header 'Content-Type: application/json' \
 
 Decryption Test ->
 curl -v --header 'Content-Type: application/json' \
-    -d '{"transactionId": 12344, "data": "BASE64(ENC_DATA_WITH_AES)", "type": 1}' \
+    -d '{"transactionId": 12344, "data": "BASE64(ENC_DATA)", "type": 1}' \
     http://localhost:9999/hsm/encdec
 
 Sing Test ->
 curl -v --header 'Content-Type: application/json' \
-    -d '{"transactionId": 345678, "data": "BASE64(PLAIN_DATA)", "type": 0}'  \
+    -d '{"transactionId": 345678, "data": "BASE64(SHA256(PLAIN_DATA))", "type": 0}'  \
     http://localhost:9999/hsm/signver
 
 Verify Test ->
